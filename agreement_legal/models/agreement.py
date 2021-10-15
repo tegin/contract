@@ -3,6 +3,7 @@
 
 import ast
 import json as simplejson
+from datetime import timedelta
 
 from lxml import etree
 
@@ -10,7 +11,8 @@ from odoo import _, api, fields, models
 
 
 class Agreement(models.Model):
-    _inherit = "agreement"
+    _name = "agreement"
+    _inherit = ["agreement", "mail.thread", "mail.activity.mixin"]
 
     name = fields.Char(string="Title", required=True)
     version = fields.Integer(
@@ -294,6 +296,38 @@ class Agreement(models.Model):
         "agreement", string="Template", domain=[("is_template", "=", True)],
     )
     readonly = fields.Boolean(related="stage_id.readonly",)
+    to_review_end_date = fields.Date(
+        compute="_compute_to_review_end_date", store=True, readonly=False
+    )
+
+    @api.depends("agreement_type_id", "agreement_type_id.review_days", "end_date")
+    def _compute_to_review_end_date(self):
+        for record in self:
+            if record.end_date:
+                record.to_review_end_date = record.end_date + timedelta(
+                    days=-record.agreement_type_id.review_days
+                )
+
+    @api.model
+    def _alert_end_date(self):
+        activities = self.search(
+            [
+                ("to_review_end_date", "=", fields.datetime.today()),
+                ("agreement_type_id.review_user_id", "!=", False),
+            ]
+        )
+        for activity in activities:
+            if (
+                self.env["mail.activity"].search_count(
+                    [("res_id", "=", activity.id), ("res_model", "=", "agreement")]
+                )
+                == 0
+            ):
+                activity.activity_schedule(
+                    "agreement_legal.mail_activity_old_date",
+                    user_id=activity.type_id.review_user_id.id,
+                    note=_("your activity is going to end in a week"),
+                )
 
     # compute the dynamic content for jinja expression
     def _compute_dynamic_description(self):
