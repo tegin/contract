@@ -107,9 +107,7 @@ class CreateContractWizard(models.TransientModel):
         return super().view_init(fields)
 
     def write_agreement(self, agreement):
-        agreement.write(
-            {"contract_type": self.contract_type,}
-        )
+        agreement.write({"contract_type": self.contract_type})
         return agreement
 
     def prepare_contract(self, agreement):
@@ -175,9 +173,7 @@ class CreateContractWizard(models.TransientModel):
                 line_vals = self.prepare_contract_line(line, contract)
                 contract_line_ids += [(0, 0, line_vals)]
             if contract_line_ids:
-                contract.write(
-                    {"contract_line_ids": contract_line_ids,}
-                )
+                contract.write({"contract_line_ids": contract_line_ids})
             contracts |= contract
             self.write_agreement(agreement)
         xml_id = (
@@ -188,7 +184,5 @@ class CreateContractWizard(models.TransientModel):
         action = self.env["ir.actions.act_window"]._for_xml_id(xml_id)
         context = literal_eval(action["context"].strip())
         context.pop("search_default_not_finished", None)
-        action.update(
-            {"domain": [("id", "in", contracts.ids)], "context": context,}
-        )
+        action.update({"domain": [("id", "in", contracts.ids)], "context": context})
         return action

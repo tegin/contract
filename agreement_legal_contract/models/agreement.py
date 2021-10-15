@@ -36,6 +36,6 @@ class Agreement(models.Model):
         context = literal_eval(action["context"].strip())
         context.pop("search_default_not_finished", None)
         action.update(
-            {"domain": [("id", "in", self._get_contract().ids)], "context": context,}
+            {"domain": [("id", "in", self._get_contract().ids)], "context": context}
         )
         return action
