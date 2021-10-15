@@ -48,7 +48,6 @@
             </form>
         </field>
     </record>
-
     <record id="create_contract_action" model="ir.actions.act_window">
         <field name="name">Create Contract</field>
         <field name="res_model">create.contract.wizard</field>

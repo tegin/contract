@@ -9,9 +9,7 @@ class ContractContract(models.Model):
     _inherit = "contract.contract"
 
     agreement_id = fields.Many2one(
-        comodel_name="agreement",
-        string="Agreement",
-        ondelete="restrict",
+        comodel_name="agreement", string="Agreement", ondelete="restrict",
     )
 
     @api.constrains("agreement_id", "active")

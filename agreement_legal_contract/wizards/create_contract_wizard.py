@@ -62,14 +62,8 @@ class CreateContractWizard(models.TransientModel):
             "(pre-paid) or end (post-paid) of the period."
         ),
     )
-    date_start = fields.Date(
-        string="Date Start",
-        required=True,
-    )
-    date_end = fields.Date(
-        string="Date End",
-        required=True,
-    )
+    date_start = fields.Date(string="Date Start", required=True,)
+    date_end = fields.Date(string="Date End", required=True,)
 
     @api.depends("contract_type", "company_id")
     def _compute_journal_id(self):
@@ -114,9 +108,7 @@ class CreateContractWizard(models.TransientModel):
 
     def write_agreement(self, agreement):
         agreement.write(
-            {
-                "contract_type": self.contract_type,
-            }
+            {"contract_type": self.contract_type,}
         )
         return agreement
 
@@ -184,9 +176,7 @@ class CreateContractWizard(models.TransientModel):
                 contract_line_ids += [(0, 0, line_vals)]
             if contract_line_ids:
                 contract.write(
-                    {
-                        "contract_line_ids": contract_line_ids,
-                    }
+                    {"contract_line_ids": contract_line_ids,}
                 )
             contracts |= contract
             self.write_agreement(agreement)
@@ -199,9 +189,6 @@ class CreateContractWizard(models.TransientModel):
         context = literal_eval(action["context"].strip())
         context.pop("search_default_not_finished", None)
         action.update(
-            {
-                "domain": [("id", "in", contracts.ids)],
-                "context": context,
-            }
+            {"domain": [("id", "in", contracts.ids)], "context": context,}
         )
         return action
