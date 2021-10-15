@@ -13,9 +13,7 @@ class Agreement(models.Model):
         selection=[("sale", "Customer"), ("purchase", "Supplier")],
     )
     contract_count = fields.Integer(
-        compute="_compute_contract_count",
-        string="Contract Count",
-        compute_sudo=True,
+        compute="_compute_contract_count", string="Contract Count", compute_sudo=True,
     )
 
     def _get_contract(self):
@@ -38,9 +36,6 @@ class Agreement(models.Model):
         context = literal_eval(action["context"].strip())
         context.pop("search_default_not_finished", None)
         action.update(
-            {
-                "domain": [("id", "in", self._get_contract().ids)],
-                "context": context,
-            }
+            {"domain": [("id", "in", self._get_contract().ids)], "context": context,}
         )
         return action
