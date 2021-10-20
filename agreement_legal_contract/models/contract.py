@@ -8,17 +8,9 @@ from odoo.exceptions import UserError
 class ContractContract(models.Model):
     _inherit = "contract.contract"
 
-    agreement_id = fields.Many2one(
-        comodel_name="agreement", string="Agreement", ondelete="restrict",
+    agreement_ids = fields.One2many(
+        comodel_name="agreement",
+        inverse_name="contract_id",
+        string="Agreement",
+        ondelete="restrict",
     )
-
-    @api.constrains("agreement_id", "active")
-    def _check_contract(self):
-        contracts = self.search([("agreement_id", "=", self.agreement_id.id)])
-        if self.agreement_id and len(contracts) > 1:
-            raise UserError(
-                _(
-                    "Contract related with agreement '%s' must have only one contract."
-                    % (self.agreement_id.name,)
-                )
-            )
