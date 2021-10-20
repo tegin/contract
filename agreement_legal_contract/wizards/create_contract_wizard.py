@@ -11,16 +11,22 @@ class CreateContractWizard(models.TransientModel):
     _name = "create.contract.wizard"
     _description = "Create Contract Wizard"
 
+    agreement_id = fields.Many2one("agreement", required=True)
+    contract_id = fields.Many2one(
+        "contract.contract",
+        states={"new": [("invisible", True)], "reuse": [("required", True)]},
+    )
+    company_id = fields.Many2one(related="agreement_id.company_id")
+    partner_id = fields.Many2one(related="agreement_id.partner_id")
+    state = fields.Selection(
+        [("new", "Create contract"), ("reuse", "Reuse contract")],
+        default="new",
+        required=True,
+    )
     contract_type = fields.Selection(
         selection=[("sale", "Customer"), ("purchase", "Supplier")],
         default="sale",
         required=True,
-    )
-    company_id = fields.Many2one(
-        comodel_name="res.company",
-        string="Company",
-        required=True,
-        default=lambda self: self.env.company.id,
     )
     journal_id = fields.Many2one(
         comodel_name="account.journal",
@@ -29,13 +35,13 @@ class CreateContractWizard(models.TransientModel):
         compute="_compute_journal_id",
         store=True,
         readonly=False,
-        required=True,
+        states={"new": [("required", True)], "reuse": [("invisible", True)]},
     )
     recurring_interval = fields.Integer(
         default=1,
         string="Invoice Every",
-        required=True,
         help="Invoice every (Days/Week/Month/Year)",
+        states={"new": [("required", True)], "reuse": [("invisible", True)]},
     )
     recurring_rule_type = fields.Selection(
         selection=[
@@ -49,14 +55,14 @@ class CreateContractWizard(models.TransientModel):
         ],
         default="monthly",
         string="Recurrence",
-        required=True,
+        states={"new": [("required", True)], "reuse": [("invisible", True)]},
         help="Specify Interval for automatic invoice generation.",
     )
     recurring_invoicing_type = fields.Selection(
         selection=[("pre-paid", "Pre-paid"), ("post-paid", "Post-paid")],
         default="pre-paid",
         string="Invoicing type",
-        required=True,
+        states={"new": [("required", True)], "reuse": [("invisible", True)]},
         help=(
             "Specify if the invoice must be generated at the beginning "
             "(pre-paid) or end (post-paid) of the period."
@@ -71,7 +77,7 @@ class CreateContractWizard(models.TransientModel):
         for rec in self:
             domain = [
                 ("type", "=", rec.contract_type),
-                ("company_id", "=", rec.company_id.id),
+                ("company_id", "=", rec.agreement_id.company_id.id),
             ]
             journal = AccountJournal.search(domain, limit=1)
             if journal:
@@ -80,10 +86,11 @@ class CreateContractWizard(models.TransientModel):
     @api.model
     def default_get(self, fields):
         res = super().default_get(fields)
-        agreements = self.env["agreement"].browse(self._context.get("active_ids", []))
-        if len(agreements) == 1:
-            res["date_start"] = agreements[0].start_date
-            res["date_end"] = agreements[0].end_date
+        agreements = self.env["agreement"].browse(self._context.get("active_id", []))
+        if agreements:
+            res["agreement_id"] = agreements.id
+            res["date_start"] = agreements.start_date
+            res["date_end"] = agreements.end_date
         return res
 
     @api.model
@@ -92,10 +99,7 @@ class CreateContractWizard(models.TransientModel):
         active_id = self._context.get("active_id")
         if active_model == "agreement":
             agreement = self.env[active_model].browse(active_id)
-            contracts = self.env["contract.contract"].search(
-                [("agreement_id", "=", active_id)]
-            )
-            if contracts:
+            if agreement.contract_id:
                 raise UserError(
                     _(
                         "Contract is created already, "
@@ -106,8 +110,10 @@ class CreateContractWizard(models.TransientModel):
                 raise UserError(_("No agreement lines !!"))
         return super().view_init(fields)
 
-    def write_agreement(self, agreement):
-        agreement.write({"contract_type": self.contract_type})
+    def write_agreement(self, agreement, contract):
+        agreement.write(
+            {"contract_type": self.contract_type, "contract_id": contract.id}
+        )
         return agreement
 
     def prepare_contract(self, agreement):
@@ -115,7 +121,6 @@ class CreateContractWizard(models.TransientModel):
             {
                 "name": agreement.name,
                 "partner_id": agreement.partner_id.id,
-                "agreement_id": agreement.id,
                 "contract_type": self.contract_type,
                 "journal_id": self.journal_id.id,
                 "recurring_interval": self.recurring_interval,
@@ -163,19 +168,20 @@ class CreateContractWizard(models.TransientModel):
 
     def create_contract(self):
         self.ensure_one()
-        agreements = self.env["agreement"].browse(self._context.get("active_ids", []))
         contracts = self.env["contract.contract"]
-        for agreement in agreements:
-            vals = self.prepare_contract(agreement)
+        if self.state == "new":
+            vals = self.prepare_contract(self.agreement_id)
             contract = self.env["contract.contract"].create(vals)
-            contract_line_ids = []
-            for line in agreement.line_ids:
-                line_vals = self.prepare_contract_line(line, contract)
-                contract_line_ids += [(0, 0, line_vals)]
-            if contract_line_ids:
-                contract.write({"contract_line_ids": contract_line_ids})
-            contracts |= contract
-            self.write_agreement(agreement)
+        else:
+            contract = self.contract_id
+        contract_line_ids = []
+        for line in self.agreement_id.line_ids:
+            line_vals = self.prepare_contract_line(line, contract)
+            contract_line_ids += [(0, 0, line_vals)]
+        if contract_line_ids:
+            contract.write({"contract_line_ids": contract_line_ids})
+        contracts |= contract
+        self.write_agreement(self.agreement_id, contract)
         xml_id = (
             self.contract_type == "purchase"
             and "contract.action_supplier_contract"
