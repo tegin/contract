@@ -19,7 +19,7 @@ class CreateContractWizard(models.TransientModel):
     company_id = fields.Many2one(related="agreement_id.company_id")
     partner_id = fields.Many2one(related="agreement_id.partner_id")
     state = fields.Selection(
-        [("new", "Create contract"), ("reuse", "Reuse contract"),],
+        [("new", "Create contract"), ("reuse", "Reuse contract")],
         default="new",
         required=True,
     )
